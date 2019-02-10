@@ -29,7 +29,12 @@ def game(white_engine, black_engine, game_time=300.0, verbose=False):
             time[color] -= round(end_time - start_time, 1)
 
             if time[color] < 0:
-                raise RuntimeError(color)
+                print("timeout")
+                # break
+                board.display(time)
+                return board
+
+                # raise RuntimeError(color)
 
             # Make a move, otherwise pass
             if move is not None:
