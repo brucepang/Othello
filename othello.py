@@ -3,6 +3,8 @@ from board import Board, move_string, print_moves
 
 player = {-1: "Black", 1: "White"}
 
+experiments = {"node":0,"duplicate":0,"branch":0}
+
 
 def game(white_engine, black_engine, game_time=300.0, verbose=False):
     """ Run a single game. Raise RuntimeError in the event of time expiration.
@@ -18,15 +20,20 @@ def game(white_engine, black_engine, game_time=300.0, verbose=False):
         print("INITIAL BOARD\n--\n")
         board.display(time)
 
+    move_num = 0
+    duplicateSet = set()
+
     # Do rounds
     for move_num in range(60):
         moves = []
         for color in [-1, 1]:
             start_time = timeit.default_timer()
-            move = get_move(board, engine[color], color, move_num, time)
+            move = get_move(board, engine[color], color, duplicateSet, move_num, time)
             end_time = timeit.default_timer()
             # Update user time
             time[color] -= round(end_time - start_time, 1)
+
+            # Update experiments
 
             if time[color] < 0:
                 print("timeout")
@@ -49,6 +56,9 @@ def game(white_engine, black_engine, game_time=300.0, verbose=False):
         if not moves:
             # No more legal moves. Game is over.
             break
+    print("Average nodes generated through the whole game: ",experiments["node"]/move_num)
+    print("Average branching factor through the whole game: ",experiments["branch"]/move_num)
+    print("Average duplicate nodes through the whole game: ",experiments["duplicate"]/move_num)
 
     print("FINAL BOARD\n--\n")
     board.display(time)
@@ -73,7 +83,7 @@ def winner(board):
         return (0, black_count, white_count)
 
 
-def get_move(board, engine, color, move_num, time, **kwargs):
+def get_move(board, engine, color, duplicateSet, move_num, time, **kwargs):
     """ Get the move for the given engine and color. Check validity of the 
     move. """
     legal_moves = board.get_legal_moves(color)
@@ -84,7 +94,21 @@ def get_move(board, engine, color, move_num, time, **kwargs):
         return legal_moves[0]
     else:
         try:
-            move = engine.get_move(copy.deepcopy(board), color, move_num, time[color], time[-color])
+            experiment = None
+            if hasattr(engine, 'search_depth'):
+                move = engine.get_move(copy.deepcopy(board), color, duplicateSet, move_num, time[color], time[-color])
+                experiment = engine.exp
+                # print("Nodes generated: ",experiment.getNode())
+                # print("Duplicate nodes: ",experiment.getDuplicate())
+                branchFactor = sum(experiment.getBranch())/len(experiment.getBranch())
+                # print("Average branching factor: ",branchFactor)
+                duplicateSet = experiment.getStates()
+                experiments["node"]+=experiment.getNode()
+                experiments["branch"]+=branchFactor
+                experiments["duplicate"]+=experiment.getDuplicate()
+            else:
+                move = engine.get_move(copy.deepcopy(board), color, move_num, time[color], time[-color])
+
         except Exception as e:
             print(traceback.format_exc())
             raise SystemError(color)

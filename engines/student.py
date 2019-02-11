@@ -7,11 +7,13 @@ class StudentEngine(Engine):
     search_depth = 2
     alpha_beta = False
 
-    def get_move(self, board, color, move_num=None,
+    def get_move(self, board, color, dupSet, move_num=None,
                  time_remaining=None, time_opponent=None):
         """ Wrapper function that chooses either vanilla minimax or 
         alpha-beta. """
         f = self.get_ab_minimax_move if self.alpha_beta else self.get_minimax_move
+        self.exp = Experiment()
+        self.exp.prevStates = dupSet
         return f(board, color, move_num, time_remaining, time_opponent)
 
     def get_minimax_move(self, board, color, move_num=None,
@@ -46,14 +48,30 @@ class StudentEngine(Engine):
 
     def minimax_cost(self,board,depth,maximizingPlayer,color):
         moves = board.get_legal_moves(color)
+
+        # Experiment Part
+        if self.exp.containState(board):
+            self.exp.addDuplicate()
+        else:
+            self.exp.saveState(board)
+
         if depth == 0 or len(moves) == 0:
             return self.heuristic(board),None
+
+        # Experiment Part
+        self.exp.addBranch(len(moves))
+
         if maximizingPlayer:
             maxEval = -float("inf")
             res_move = None
             for move in moves:
+                
                 newboard = deepcopy(board)
                 newboard.execute_move(move,color)
+
+                # Experiment Part
+                self.exp.addNode()
+               
                 evalulation,_ = self.minimax_cost(newboard,depth-1,not maximizingPlayer,color*-1)
                 # maxEval = max(maxEval,evalulation)
                 if evalulation > maxEval:
@@ -63,8 +81,13 @@ class StudentEngine(Engine):
             minEval = float("inf")
             res_move = None
             for move in moves:
+
                 newboard = deepcopy(board)
                 newboard.execute_move(move,color)
+
+                # Experiment Part
+                self.exp.addNode()
+
                 evalulation,_ = self.minimax_cost(newboard,depth-1,not maximizingPlayer,color*-1)
                 # minEval = min(minEval,evalulation)
                 if evalulation < minEval:
@@ -75,14 +98,30 @@ class StudentEngine(Engine):
 
     def minimax_ab_cost(self,board,depth,alpha,beta,maximizingPlayer,color):
         moves = board.get_legal_moves(color)
+
+        # Experiment Part
+        if self.exp.containState(board):
+            self.exp.addDuplicate()
+        else:
+            self.exp.saveState(board)
+
         if depth == 0 or len(moves) == 0:
             return self.heuristic(board), None
+
+        # Experiment Part
+        self.exp.addBranch(len(moves))
+
         if maximizingPlayer:
             maxEval = -float("inf")
             res_move = None
             for move in moves:
+
                 newboard = deepcopy(board)
                 newboard.execute_move(move,color)
+
+                # Experiment Part
+                self.exp.addNode()
+                
                 evalulation,_ = self.minimax_ab_cost(newboard,depth-1,alpha,beta,not maximizingPlayer,color*-1)
                 if evalulation > maxEval:
                     maxEval,res_move = evalulation,move
@@ -94,8 +133,14 @@ class StudentEngine(Engine):
             minEval = float("inf")
             res_move = None
             for move in moves:
+
+                
                 newboard = deepcopy(board)
                 newboard.execute_move(move,color)
+
+                # Experiment Part
+                self.exp.addNode()
+
                 evalulation,_ = self.minimax_ab_cost(newboard,depth-1,alpha,beta,not maximizingPlayer,color*-1)
                 if evalulation < minEval:
                     minEval,res_move = evalulation,move
@@ -110,6 +155,7 @@ class StudentEngine(Engine):
         return 15*self.coin_parity(board)+\
                30*self.mobility(board)+\
                600*self.corner_capture(board)
+
 
     def coin_parity(self,board):
         num_pieces_op = board.count(self.color*-1)
@@ -145,7 +191,43 @@ class StudentEngine(Engine):
 class Experiment():
     def __init__(self):
         self.num_nodes = 0
-        self.prevStates = dict()
-        self.branch = 0
+        self.prevStates = set()
+        self.duplicate = 0
+        self.branch = []
+
+    def addNode(self):
+        self.num_nodes+=1
+
+    def getNode(self):
+        return self.num_nodes
+
+    def saveState(self,board):
+        serialized = ""
+        for y in range(8):
+            for x in range(8):
+                serialized+=str(board[x][y])
+        self.prevStates.add(serialized)
+
+    def getStates(self):
+        return self.prevStates
+
+    def containState(self,board):
+        serialized = ""
+        for y in range(8):
+            for x in range(8):
+                serialized+=str(board[x][y])
+        return serialized in self.prevStates
+
+    def addDuplicate(self):
+        self.duplicate+=1
+
+    def getDuplicate(self):
+        return self.duplicate
+
+    def addBranch(self,num):
+        self.branch.append(num)
+
+    def getBranch(self):
+        return self.branch
 
 engine = StudentEngine
